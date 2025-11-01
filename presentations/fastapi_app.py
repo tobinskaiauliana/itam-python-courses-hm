@@ -1,10 +1,21 @@
-from fastapi import FastAPI, HTTPException, Response, status
+from fastapi import FastAPI, HTTPException, Response, status, Request
 from pydantic import BaseModel
 from services.link_service import LinkService
-
+import time
+from loguru import logger
 
 def create_app() -> FastAPI:
     app = FastAPI()
+
+    @app.middleware("http")
+    async def add_latency_header(request: Request, call_next) -> Response:
+        t0 = time.time()
+        response = await call_next(request)
+        elapsed_ms = round((time.time() - t0) * 1000, 2)
+        response.headers["X-Latency"] = str(elapsed_ms)
+        logger.debug("{} {} done in {}ms", request.method, request.url.path, elapsed_ms)
+        return response
+
     short_link_service = LinkService()
 
     class PutLink(BaseModel):
@@ -15,9 +26,12 @@ def create_app() -> FastAPI:
 
     @app.post("/link")
     def create_link(put_link_request: PutLink) -> PutLink:
-        short_link = short_link_service.create_link(put_link_request.link)
-        return PutLink(link=_service_link_to_real(short_link))
-
+        try:
+            short_link = short_link_service.create_link(put_link_request.link)
+            return PutLink(link=_service_link_to_real(short_link))
+        except Exception as e:
+            logger.exception("exception.raised")
+            raise HTTPException(status_code=422, detail=str(e))
     @app.get("/{link}")
     def get_link(link: str) -> Response:
         real_link = short_link_service.get_real_link(link)
@@ -28,3 +42,4 @@ def create_app() -> FastAPI:
         return Response(status_code=status.HTTP_301_MOVED_PERMANENTLY, headers={"Location": real_link})
 
     return app
+
