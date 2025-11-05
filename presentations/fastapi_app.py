@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Response, status, Request
 from pydantic import BaseModel
-from services.link_service import LinkService
+from services.link_service import LinkService, InvalidLink
 import time
 from loguru import logger
 
@@ -28,10 +28,9 @@ def create_app() -> FastAPI:
     def create_link(put_link_request: PutLink) -> PutLink:
         try:
             short_link = short_link_service.create_link(put_link_request.link)
-            return PutLink(link=_service_link_to_real(short_link))
-        except Exception as e:
-            logger.exception("exception.raised")
+        except InvalidLink as e:
             raise HTTPException(status_code=422, detail=str(e))
+        return PutLink(link=_service_link_to_real(short_link))
     @app.get("/{link}")
     def get_link(link: str) -> Response:
         real_link = short_link_service.get_real_link(link)

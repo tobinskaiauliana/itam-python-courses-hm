@@ -1,6 +1,7 @@
 from utils.utils_random import random_alfanum
 import re
-
+class InvalidLink(Exception):
+    pass
 class LinkService:
     def __init__(self) -> None:
         self.short_link_to_real_link: dict[str, str] = {}
@@ -12,14 +13,12 @@ class LinkService:
 
     def valid(self, url: str) -> bool:
         pattern=r'https?://[a-zA-Z0-9.-]+\.[a-zA-Z]+'
-        if re.match(pattern,url):
-            return True
-        else: return False
+        return bool(re.match(pattern,url))
 
     def create_link(self, link: str) -> str:
         link=self.add_https(link)
         if not self.valid(link):
-            raise ValueError("422")
+            raise InvalidLink("link is invalid")
         short_link = random_alfanum(5)
         self.short_link_to_real_link[short_link] = link
 
